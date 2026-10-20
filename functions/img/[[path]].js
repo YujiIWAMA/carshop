@@ -93,9 +93,14 @@ async function del(request, env, key) {
 
 // ---------- 権限確認 ----------
 // Firebase のログイン（IDトークン）を検証し、その人が店の担当者か制作者かを確かめる
+// 環境変数の前後の空白・引用符を取り除く（入力ミス対策）
+function clean(v) {
+  return String(v || "").trim().replace(/^["']+|["']+$/g, "").trim();
+}
+
 async function authorize(request, env, shopId) {
-  const projectId = env.FIREBASE_PROJECT_ID;
-  if (!projectId) return { ok: false, status: 500, message: "FIREBASE_PROJECT_ID が設定されていません" };
+  const projectId = clean(env.FIREBASE_PROJECT_ID);
+  if (!projectId) return { ok: false, status: 500, message: "FIREBASE_PROJECT_ID が設定されていません（Cloudflare の環境変数を確認し、再デプロイしてください）" };
   const m = (request.headers.get("Authorization") || "").match(/^Bearer\s+(.+)$/);
   if (!m) return { ok: false, status: 401, message: "ログインが必要です" };
 
@@ -103,10 +108,15 @@ async function authorize(request, env, shopId) {
   try {
     claims = await verifyFirebaseToken(m[1], projectId);
   } catch (e) {
-    return { ok: false, status: 401, message: "ログインの有効期限が切れています。再度ログインしてください" };
+    const reason = String((e && e.message) || "unknown");
+    if (reason === "expired") return { ok: false, status: 401, message: "ログインの有効期限が切れています。再度ログインしてください" };
+    if (reason.startsWith("bad aud")) {
+      return { ok: false, status: 401, message: `ログインを確認できませんでした（プロジェクトIDが一致しません：設定値「${projectId}」）` };
+    }
+    return { ok: false, status: 401, message: `ログインを確認できませんでした（理由：${reason}）` };
   }
   const uid = claims.sub;
-  const admins = String(env.ADMIN_UIDS || "").split(",").map((s) => s.trim()).filter(Boolean);
+  const admins = String(env.ADMIN_UIDS || "").split(",").map((s) => clean(s)).filter(Boolean);
   if (admins.includes(uid)) return { ok: true, uid };
 
   const owners = await fetchOwners(projectId, shopId);
@@ -128,7 +138,7 @@ let jwksCache = { keys: null, exp: 0 };
 async function getJwks() {
   if (jwksCache.keys && Date.now() < jwksCache.exp) return jwksCache.keys;
   const res = await fetch(JWKS_URL);
-  if (!res.ok) throw new Error("jwks fetch failed");
+  if (!res.ok) throw new Error(`jwks fetch failed ${res.status}`);
   const data = await res.json();
   const maxAge = Number(((res.headers.get("Cache-Control") || "").match(/max-age=(\d+)/) || [])[1] || 3600);
   jwksCache = { keys: data.keys || [], exp: Date.now() + maxAge * 1000 };
@@ -164,7 +174,7 @@ async function verifyFirebaseToken(token, projectId) {
   if (!ok) throw new Error("bad signature");
 
   const now = Math.floor(Date.now() / 1000);
-  if (payload.aud !== projectId) throw new Error("bad aud");
+  if (payload.aud !== projectId) throw new Error(`bad aud (${payload.aud})`);
   if (payload.iss !== `https://securetoken.google.com/${projectId}`) throw new Error("bad iss");
   if (!payload.sub || typeof payload.sub !== "string") throw new Error("no sub");
   if (!(payload.exp > now - 60)) throw new Error("expired");
