@@ -5,12 +5,12 @@
 // Firebaseコンソール →「プロジェクトの設定」→「マイアプリ」の値を貼り付けます。
 // apiKey が空のあいだは、自動的にデモモード（Firebaseなし）で動きます。
 export const firebaseConfig = {
-  apiKey: "",
-  authDomain: "",
-  projectId: "",
-  storageBucket: "",
-  messagingSenderId: "",
-  appId: ""
+  apiKey: "AIzaSyC2YFqOJMr17hpWQcOox2cOlFqF6nCrRiM",
+  authDomain: "car-shop-homepage.firebaseapp.com",
+  projectId: "car-shop-homepage",
+  storageBucket: "car-shop-homepage.firebasestorage.app",
+  messagingSenderId: "590408973465",
+  appId: "1:590408973465:web:ef2761d0e45b667090cc08"
 };
 
 export const FIREBASE_SDK_VERSION = "13.0.0";
