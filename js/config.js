@@ -23,7 +23,7 @@ export const PHOTO_BACKEND = "cloudflare";
 
 // 制作者（あなた）のアカウントのUID。全店舗を編集できます。
 // 画面表示の判定用です。実際の権限は firestore.rules / storage.rules 側の同じ値で決まります。
-export const ADMIN_UIDS = [bB5NdTAUPzb5QvxnQhuprQsW5702];
+export const ADMIN_UIDS = ["bB5NdTAUPzb5QvxnQhuprQsW5702"];
 
 // 店IDの決め方
 //  1. URLに ?shop=xxx があればそれを使う（ローカル確認用）
