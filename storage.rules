@@ -1,0 +1,28 @@
+rules_version = '2';
+
+// Cloud Storage セキュリティルール
+// ★ ADMIN_UID を、制作者（あなた）のアカウントのUIDに置き換えてください（firestore.rules と同じ値）
+service firebase.storage {
+  match /b/{bucket}/o {
+    match /shops/{shopId}/{allPaths=**} {
+      // 写真は公開サイトで表示するため誰でも読める
+      allow read: if true;
+
+      // アップロード：制作者または店の担当者。画像のみ・1ファイル3MBまで
+      allow create, update: if request.auth != null
+        && (request.auth.uid in ['ADMIN_UID']
+            || request.auth.uid in firestore.get(/databases/(default)/documents/shops/$(shopId)).data.owners)
+        && request.resource.size < 3 * 1024 * 1024
+        && request.resource.contentType.matches('image/.*');
+
+      // 削除：制作者または店の担当者
+      allow delete: if request.auth != null
+        && (request.auth.uid in ['ADMIN_UID']
+            || request.auth.uid in firestore.get(/databases/(default)/documents/shops/$(shopId)).data.owners);
+    }
+
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

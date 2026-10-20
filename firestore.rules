@@ -1,0 +1,42 @@
+rules_version = '2';
+
+// Firestore セキュリティルール
+// ★ ADMIN_UID を、制作者（あなた）のアカウントのUIDに置き換えてください（storage.rules も同じ）
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isAdmin() {
+      return request.auth != null && request.auth.uid in ['ADMIN_UID'];
+    }
+    function isOwner(shopId) {
+      return request.auth != null
+        && exists(/databases/$(database)/documents/shops/$(shopId))
+        && request.auth.uid in get(/databases/$(database)/documents/shops/$(shopId)).data.owners;
+    }
+
+    match /shops/{shopId} {
+      // 店舗情報は公開サイトで表示するため誰でも読める
+      allow read: if true;
+      // 店舗の作成・削除は制作者のみ
+      allow create, delete: if isAdmin();
+      // 更新は制作者、または担当者（担当者は owners を変更できない）
+      allow update: if isAdmin()
+        || (isOwner(shopId)
+            && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['owners']));
+
+      match /data/{docId} {
+        // 在庫ドキュメントのみ。公開サイトで表示するため誰でも読める
+        allow read: if docId == 'inventory';
+        allow write: if docId == 'inventory'
+          && (isAdmin() || isOwner(shopId))
+          && request.resource.data.cars is list
+          && request.resource.data.cars.size() <= 300;
+      }
+    }
+
+    // それ以外はすべて拒否
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

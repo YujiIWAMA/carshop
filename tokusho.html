@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>特定商取引法に基づく表記</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;900&family=Barlow+Condensed:wght@600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/site.css">
+</head>
+<body>
+<div id="site-header"></div>
+<main id="main"><p class="loading">読み込み中…</p></main>
+<div id="site-footer"></div>
+<script type="module">
+import { resolveShopId } from "./js/config.js";
+import { getShop } from "./js/store.js";
+import { esc } from "./js/util.js";
+import { mountChrome, showFatal } from "./js/site-common.js";
+
+const shop = await getShop(resolveShopId()).catch(() => null);
+if (!shop) {
+  showFatal("このサイトは準備中です。");
+} else {
+  mountChrome(shop);
+  document.title = `特定商取引法に基づく表記｜${shop.name}`;
+  const t = shop.tokusho || {}, k = shop.kobutsu || {};
+  const rows = [
+    ["販売業者", t.operator || shop.name],
+    ["運営責任者", t.representative],
+    ["所在地", shop.address],
+    ["電話番号", shop.tel],
+    ["メールアドレス", t.email],
+    ["古物商許可", [k.commission, k.number, k.holder].filter(Boolean).join(" ")],
+    ["販売価格", t.price || "各車両ページに支払総額（税込）および内訳を表示しています。"],
+    ["代金以外の必要料金", t.extraFees || "支払総額に含まれない費用（ご希望のオプション、遠方への納車費用など）が発生する場合は、ご契約前にお見積りでご案内します。"],
+    ["お支払い方法", t.payment || "現金、銀行振込、オートローン"],
+    ["引渡し時期", t.delivery || "ご契約・ご入金の確認後、登録手続きが完了次第お引き渡しします。"],
+    ["返品・キャンセル", t.returns || "車両の性質上、ご契約後のお客様都合による返品はお受けしておりません。詳しくはご契約時にご説明します。"]
+  ].filter(([, v]) => v);
+  document.querySelector("main").innerHTML = `
+    <div class="wrap"><div class="doc">
+      <h1>特定商取引法に基づく表記</h1>
+      <table><tbody>${rows.map(([a, b]) => `<tr><th scope="row">${esc(a)}</th><td style="white-space:pre-line">${esc(b)}</td></tr>`).join("")}</tbody></table>
+    </div></div>`;
+}
+</script>
+</body>
+</html>
