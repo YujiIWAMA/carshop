@@ -6,10 +6,12 @@
 //   shops/{店ID}/data/inventory  在庫すべてを1つのドキュメントに格納
 //     cars: [ {...}, ... ]       閲覧1回 = 読み取り1回で済むようにまとめている
 //
-// 写真（Cloud Storage）
-//   shops/{店ID}/cars/{車ID}/{名前}.jpg
+// 写真（config.js の PHOTO_BACKEND で切り替え）
+//   cloudflare: /img/{店ID}/{車ID}/{名前}.jpg（functions/img/ が KV に保存・配信）
+//   firebase:   Cloud Storage の shops/{店ID}/cars/{車ID}/{名前}.jpg
+// 車両データには写真のURLとパスをそのまま保存するので、保存先を切り替えても古い写真は表示され続ける
 
-import { firebaseConfig, FIREBASE_SDK_VERSION, isDemo } from "./config.js";
+import { firebaseConfig, FIREBASE_SDK_VERSION, PHOTO_BACKEND, isDemo } from "./config.js";
 import { DEMO_SHOP, DEMO_CARS } from "./demo-data.js";
 import { blobToDataURL } from "./util.js";
 
@@ -23,21 +25,47 @@ function loadFirebase() {
 
 async function initFirebase() {
   const base = `https://www.gstatic.com/firebasejs/${FIREBASE_SDK_VERSION}`;
-  const [appMod, fsMod, authMod, stMod] = await Promise.all([
+  const [appMod, fsMod, authMod] = await Promise.all([
     import(`${base}/firebase-app.js`),
     import(`${base}/firebase-firestore.js`),
-    import(`${base}/firebase-auth.js`),
-    import(`${base}/firebase-storage.js`)
+    import(`${base}/firebase-auth.js`)
   ]);
   const app = appMod.initializeApp(firebaseConfig);
   return {
+    app,
     db: fsMod.getFirestore(app),
     auth: authMod.getAuth(app),
-    storage: stMod.getStorage(app),
     fs: fsMod,
-    au: authMod,
-    st: stMod
+    au: authMod
   };
+}
+
+// Firebase Storage は使うときだけ読み込む（無料プランでは使わない）
+let stPromise = null;
+function loadStorage() {
+  if (!stPromise) {
+    stPromise = (async () => {
+      const { app } = await loadFirebase();
+      const st = await import(`https://www.gstatic.com/firebasejs/${FIREBASE_SDK_VERSION}/firebase-storage.js`);
+      return { storage: st.getStorage(app), st };
+    })();
+  }
+  return stPromise;
+}
+
+// Cloudflare 側（functions/img/）への送信。ログイン中のIDトークンを付ける
+async function cfFetch(path, init) {
+  const { auth } = await loadFirebase();
+  if (!auth.currentUser) throw new Error("ログインが必要です");
+  const token = await auth.currentUser.getIdToken();
+  const res = await fetch(path, { ...init, headers: { ...(init.headers || {}), Authorization: `Bearer ${token}` } });
+  if (!res.ok) {
+    const msg = (await res.text().catch(() => "")) || `エラー（${res.status}）`;
+    const err = new Error(msg);
+    err.status = res.status;
+    throw err;
+  }
+  return res;
 }
 
 // ---------- デモ版（ブラウザ内に保存。Firebase 不要） ----------
@@ -119,7 +147,15 @@ export async function uploadPhoto(shopId, carId, name, blob) {
   if (DEMO) {
     return { url: await blobToDataURL(blob), path: `demo/${carId}/${name}` };
   }
-  const { storage, st } = await loadFirebase();
+  if (PHOTO_BACKEND === "cloudflare") {
+    const res = await cfFetch(`/img/${shopId}/${carId}/${name}.jpg`, {
+      method: "PUT",
+      headers: { "Content-Type": "image/jpeg" },
+      body: blob
+    });
+    return await res.json(); // { url: "/img/...", path: "img/..." }
+  }
+  const { storage, st } = await loadStorage();
   const path = `shops/${shopId}/cars/${carId}/${name}.jpg`;
   const r = st.ref(storage, path);
   await st.uploadBytes(r, blob, {
@@ -129,9 +165,18 @@ export async function uploadPhoto(shopId, carId, name, blob) {
   return { url: await st.getDownloadURL(r), path };
 }
 
+// 写真の削除。パスの形で保存先を判断する（切り替え前の古い写真も消せる）
 export async function deletePhoto(path) {
   if (DEMO || !path) return;
-  const { storage, st } = await loadFirebase();
+  if (path.startsWith("img/")) {
+    try {
+      await cfFetch(`/${path}`, { method: "DELETE" });
+    } catch (e) {
+      if (e.status !== 404) throw e;
+    }
+    return;
+  }
+  const { storage, st } = await loadStorage();
   try {
     await st.deleteObject(st.ref(storage, path));
   } catch (e) {

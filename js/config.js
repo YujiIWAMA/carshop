@@ -15,6 +15,12 @@ export const firebaseConfig = {
 
 export const FIREBASE_SDK_VERSION = "13.0.0";
 
+// 写真の保存先
+//   "cloudflare" … Cloudflare KV（無料・カード登録不要。1日10万回まで）←初期設定
+//   "firebase"   … Firebase Storage（Blazeプランが必要。上限で止まらず従量課金）
+// 切り替えても、それまでに登録した写真はそのまま表示されます（新しい写真から保存先が変わります）。
+export const PHOTO_BACKEND = "cloudflare";
+
 // 制作者（あなた）のアカウントのUID。全店舗を編集できます。
 // 画面表示の判定用です。実際の権限は firestore.rules / storage.rules 側の同じ値で決まります。
 export const ADMIN_UIDS = [];

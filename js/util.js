@@ -106,7 +106,11 @@ async function loadBitmap(file) {
   return await new Promise((res, rej) => {
     const img = new Image();
     img.onload = () => res(img);
-    img.onerror = () => rej(new Error("画像を読み込めませんでした"));
+    img.onerror = () => rej(new Error(
+      /\.(heic|heif)$/i.test(file.name || "")
+        ? "この写真形式（HEIC）はこの端末では読み込めません。スマホから直接選ぶか、JPEGに変換してから選んでください"
+        : "画像を読み込めませんでした。別の写真でお試しください"
+    ));
     img.src = URL.createObjectURL(file);
   });
 }
