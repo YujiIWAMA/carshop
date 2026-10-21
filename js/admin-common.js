@@ -20,6 +20,25 @@ export function bindDemoReset() {
 }
 
 function loginHTML(shopName) {
+  // デモでは入力欄を出さない（ブラウザのパスワード管理が「流出したパスワード」と警告するのを防ぐ）
+  if (demoMode) {
+    return `
+  ${demoFlagHTML()}
+  <div class="login">
+    <div class="login-brand">
+      <b>${esc(shopName || "在庫管理")}</b>
+      <span>在庫管理画面（デモ）</span>
+    </div>
+    <form class="card" id="login-form">
+      <p style="margin:0;font-size:14px;line-height:1.8;color:#374151">
+        実際の店舗さまは、メールアドレスとパスワードでログインします。<br>
+        デモでは下のボタンから、そのままお試しいただけます。
+      </p>
+      <p class="form-msg" id="login-msg" role="alert"></p>
+      <button class="btn btn-accent" type="submit">デモを開く</button>
+    </form>
+  </div>`;
+  }
   return `
   ${demoFlagHTML()}
   <div class="login">
@@ -29,10 +48,10 @@ function loginHTML(shopName) {
     </div>
     <form class="card" id="login-form" novalidate>
       <label class="f">メールアドレス
-        <input type="email" name="email" autocomplete="username" inputmode="email" required ${demoMode ? 'value="demo@example.com"' : ""}>
+        <input type="email" name="email" autocomplete="username" inputmode="email" required>
       </label>
       <label class="f">パスワード
-        <input type="password" name="password" autocomplete="current-password" required ${demoMode ? 'value="demo"' : ""}>
+        <input type="password" name="password" autocomplete="current-password" required>
       </label>
       <p class="form-msg" id="login-msg" role="alert"></p>
       <button class="btn btn-accent" type="submit">ログイン</button>
@@ -60,15 +79,20 @@ export async function gate(root, onReady) {
         btn.disabled = true;
         $("#login-msg").textContent = "";
         try {
+          if (demoMode) {
+            await signIn("demo@example.com", "");
+            location.reload();
+            return;
+          }
           await signIn(form.email.value.trim(), form.password.value);
-          if (demoMode) location.reload();
         } catch (err) {
           $("#login-msg").textContent = errMessage(err);
         } finally {
           btn.disabled = false;
         }
       });
-      $("#reset-btn").addEventListener("click", async () => {
+      const resetBtn = $("#reset-btn");
+      if (resetBtn) resetBtn.addEventListener("click", async () => {
         const email = form.email.value.trim();
         if (!email) {
           $("#login-msg").textContent = "メールアドレスを入力してから押してください";
