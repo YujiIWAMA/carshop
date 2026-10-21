@@ -1,5 +1,5 @@
 // 共通の小さな道具
-
+ 
 // HTMLエスケープ（店が入力した文字は必ずこれを通して表示する）
 export function esc(v) {
   return String(v ?? "")
@@ -9,25 +9,26 @@ export function esc(v) {
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#39;");
 }
-
+ 
 // 現在の ?demo / ?shop を引き継いだリンクを作る
 export function link(path, extra = {}) {
   const cur = new URLSearchParams(location.search);
   const p = new URLSearchParams();
   if (cur.has("demo")) p.set("demo", "");
+  if (cur.has("live")) p.set("live", "");
   if (cur.get("shop")) p.set("shop", cur.get("shop"));
   for (const [k, v] of Object.entries(extra)) p.set(k, v);
-  const s = p.toString().replace(/demo=(&|$)/, "demo$1");
+  const s = p.toString().replace(/(demo|live)=(&|$)/g, "$1$2");
   return s ? `${path}?${s}` : path;
 }
-
+ 
 export const $ = (sel, root = document) => root.querySelector(sel);
 export const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
-
+ 
 export function param(name) {
   return new URLSearchParams(location.search).get(name);
 }
-
+ 
 // 表示用フォーマット
 export function fmtMan(n) {
   const v = Number(n);
@@ -53,7 +54,7 @@ export function fees(car) {
   if (!isFinite(t) || !isFinite(b)) return null;
   return Math.round((t - b) * 10) / 10;
 }
-
+ 
 export const STATUSES = [
   { id: "draft", label: "下書き" },
   { id: "onsale", label: "掲載中" },
@@ -61,22 +62,22 @@ export const STATUSES = [
   { id: "sold", label: "売約済" }
 ];
 export const statusLabel = (id) => (STATUSES.find((s) => s.id === id) || {}).label || id;
-
+ 
 // 公開サイトに出すのは下書き以外
 export const isPublic = (car) => car.status && car.status !== "draft";
-
+ 
 // 新着判定（登録から14日以内）
 export function isNew(car) {
   if (!car.createdAt) return false;
   return Date.now() - Number(car.createdAt) < 14 * 24 * 60 * 60 * 1000;
 }
-
+ 
 export function newId() {
   const a = new Uint8Array(6);
   crypto.getRandomValues(a);
   return "c" + [...a].map((b) => b.toString(16).padStart(2, "0")).join("");
 }
-
+ 
 // 写真を縮小して JPEG Blob にする（長辺 max px）
 export async function resizeImage(file, max, quality = 0.82) {
   const bmp = await loadBitmap(file);
@@ -95,7 +96,7 @@ export async function resizeImage(file, max, quality = 0.82) {
     canvas.toBlob((b) => (b ? res(b) : rej(new Error("画像の変換に失敗しました"))), "image/jpeg", quality)
   );
 }
-
+ 
 async function loadBitmap(file) {
   if ("createImageBitmap" in window) {
     try {
@@ -114,7 +115,7 @@ async function loadBitmap(file) {
     img.src = URL.createObjectURL(file);
   });
 }
-
+ 
 export function blobToDataURL(blob) {
   return new Promise((res) => {
     const r = new FileReader();
@@ -122,7 +123,7 @@ export function blobToDataURL(blob) {
     r.readAsDataURL(blob);
   });
 }
-
+ 
 // 画面下に短いメッセージを出す
 export function toast(msg, kind = "ok") {
   let el = document.getElementById("toast");
@@ -139,6 +140,7 @@ export function toast(msg, kind = "ok") {
   clearTimeout(el._t);
   el._t = setTimeout(() => el.classList.remove("show"), 2600);
 }
-
+ 
 // 車のアイコン（写真がないときの代わり）
 export const CAR_SVG = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 17H3v-5l2-5h14l2 5v5h-2"/><circle cx="7.5" cy="17" r="2"/><circle cx="16.5" cy="17" r="2"/><path d="M9.5 17h5"/><path d="M4 12h16"/></svg>`;
+ 
