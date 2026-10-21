@@ -25,6 +25,11 @@ export const PHOTO_BACKEND = "cloudflare";
 // 画面表示の判定用です。実際の権限は firestore.rules / storage.rules 側の同じ値で決まります。
 export const ADMIN_UIDS = ["bB5NdTAUPzb5QvxnQhuprQsW5702"];
 
+// 常にデモとして表示するサイト（pages.dev の名前、または独自ドメイン）
+// ここに入れたサイトは ?demo を付けなくてもサンプルデータで動きます。
+// 本番データを確認したいときだけ、URLに ?live を付けます。
+export const DEMO_HOSTS = ["demo-f2u"];
+
 // 店IDの決め方
 //  1. URLに ?shop=xxx があればそれを使う（ローカル確認用）
 //  2. https://<店ID>.pages.dev なら、その <店ID> を使う
@@ -46,8 +51,16 @@ export function resolveShopId() {
   return "demo";
 }
 
-// デモモード：?demo を付けたとき、または Firebase 未設定のとき
+// デモモードになる条件
+//   ・Firebase が未設定
+//   ・URLに ?demo が付いている
+//   ・DEMO_HOSTS に入っているサイト（ただし ?live を付けたときは本番）
 export function isDemo() {
   const p = new URLSearchParams(location.search);
-  return p.has("demo") || !firebaseConfig.apiKey;
+  if (!firebaseConfig.apiKey) return true;
+  if (p.has("demo")) return true;
+  if (p.has("live")) return false;
+  const host = location.hostname;
+  const m = host.match(/([a-z0-9-]+)\.pages\.dev$/);
+  return DEMO_HOSTS.includes(host) || (m && DEMO_HOSTS.includes(m[1])) || false;
 }
